@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BitCounter Pico — Aprendendo Binário</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#12121a;
+  min-height:100vh;display:flex;justify-content:center;align-items:center;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color:#ccc;padding:16px;
+  position:relative
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:24px 24px;
+  pointer-events:none;z-index:0
+}
+.container{max-width:560px;width:100%;position:relative;z-index:1}
+.card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
+  border-radius:16px;padding:28px;margin-bottom:16px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)
+}
+/* ---- Breadboard rails ---- */
+.card:not(.header){border-left:4px solid #ef5350;border-right:4px solid #42a5f5}
+/* ---- Header ---- */
+.header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.header h1{
+  font-size:1.15rem;font-weight:700;color:#eee;
+  letter-spacing:-.3px;display:flex;align-items:center;gap:10px
+}
+.header h1 span{color:#ef5350}
+.pico-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(45,90,39,.15);border:1px solid rgba(45,90,39,.3);
+  border-radius:6px;padding:3px 8px 3px 4px;
+  font-size:.5rem;font-weight:700;color:#66bb6a;
+  letter-spacing:.4px;position:relative;
+  text-transform:uppercase
+}
+.pico-badge::before{
+  content:'';width:20px;height:14px;
+  background:linear-gradient(180deg,#3a7a33 0%,#2d5a27 100%);
+  border-radius:2px;position:relative;display:inline-block;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)
+}
+.pico-badge::after{
+  content:'RP2040';position:absolute;font-size:.35rem;
+  color:rgba(255,255,255,.3);font-weight:600;
+  top:5px;left:12px;letter-spacing:0
+}
+.badge-pad{
+  width:3px;height:3px;background:#c8922a;
+  border-radius:50%;display:inline-block;
+  box-shadow:0 5px 0 #c8922a,0 10px 0 #c8922a
+}
+.status{display:flex;align-items:center;gap:7px;font-size:.8rem;color:rgba(255,255,255,.45)}
+.dot{
+  width:9px;height:9px;border-radius:50%;
+  background:rgba(255,255,255,.15);transition:all .4s ease
+}
+.dot.on{background:#66bb6a;box-shadow:0 0 12px #66bb6aaa}
+.dot.off{background:#ef5350;box-shadow:0 0 12px #ef535066}
+/* ---- LEDs ---- */
+.led-area{margin:18px 0 8px;position:relative}
+.led-row{display:flex;justify-content:center;gap:5px}
+.led{
+  width:40px;height:40px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+  cursor:pointer;transition:all .15s ease;position:relative
+}
+.led.on{
+  background:var(--c);border-color:var(--c);
+  box-shadow:0 0 14px var(--c),0 0 40px color-mix(in srgb,var(--c) 25%,transparent);
+  animation:ledPulse 2s ease-in-out infinite
+}
+@keyframes ledPulse{
+  0%,100%{box-shadow:0 0 14px var(--c),0 0 40px color-mix(in srgb,var(--c) 25%,transparent)}
+  50%{box-shadow:0 0 20px var(--c),0 0 60px color-mix(in srgb,var(--c) 40%,transparent)}
+}
+.led.off{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
+.led:hover{transform:scale(1.12)}
+.led:active{transform:scale(.95)}
+.led-label{
+  display:flex;justify-content:center;gap:5px;margin-top:3px
+}
+.led-label span{
+  width:40px;text-align:center;
+  font-size:.55rem;color:rgba(255,255,255,.25);font-weight:600;
+  font-variant-numeric:tabular-nums
+}
+/* ---- Number ---- */
+.num-wrap{text-align:center;margin:16px 0 10px}
+.num-val{
+  font-size:4.2rem;font-weight:800;color:#eee;
+  letter-spacing:-2px;font-variant-numeric:tabular-nums;
+  line-height:1.1;transition:color .2s
+}
+.num-bin{
+  font-family:'Fira Code','JetBrains Mono','Cascadia Code','Courier New',monospace;
+  font-size:1.6rem;color:#42a5f5;letter-spacing:5px;
+  margin-top:2px;font-weight:500
+}
+/* ---- Powers ---- */
+.powers{
+  display:flex;justify-content:center;flex-wrap:wrap;
+  gap:5px;margin:14px 0 6px
+}
+.pow{
+  padding:4px 10px;border-radius:8px;
+  font-size:.8rem;font-weight:600;font-variant-numeric:tabular-nums;
+  transition:all .25s ease
+}
+.pow.on{background:rgba(66,165,245,.1);color:#42a5f5;border:1px solid rgba(66,165,245,.2)}
+.pow.off{background:rgba(255,255,255,.03);color:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.05);text-decoration:line-through}
+.sum-row{text-align:center;font-size:.85rem;color:rgba(255,255,255,.35);margin:6px 0 10px;line-height:1.5}
+.sum-row strong{color:#42a5f5;font-weight:700}
+/* ---- Controls ---- */
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px}
+.ctrl-row2{margin-top:4px}
+input[type=number]{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;padding:10px 14px;color:#eee;
+  font-size:.95rem;width:110px;text-align:center;
+  outline:none;transition:border-color .2s;
+  -moz-appearance:textfield
+}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]:focus{border-color:#42a5f5;box-shadow:0 0 0 3px rgba(66,165,245,.1)}
+button{
+  padding:9px 18px;border-radius:12px;border:none;
+  font-size:.85rem;font-weight:600;cursor:pointer;
+  transition:all .15s ease;font-family:inherit
+}
+button:active{transform:scale(.95)}
+.btn-go{background:#42a5f5;color:#12121a}
+.btn-go:hover{background:#1e88e5;transform:translateY(-1px)}
+.btn-sec{
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);
+  border:1px solid rgba(255,255,255,.08)
+}
+.btn-sec:hover{background:rgba(255,255,255,.1)}
+.btn-sec.active{background:rgba(66,165,245,.12);border-color:rgba(66,165,245,.2);color:#42a5f5}
+.btn-adj{min-width:48px;padding:9px 0}
+.btn-danger{
+  background:rgba(255,255,255,.06);color:#ef5350;
+  border:1px solid rgba(239,83,80,.15)
+}
+.btn-danger:hover{background:rgba(239,83,80,.1)}
+.btn-auto.active{
+  background:rgba(66,165,245,.12);border-color:rgba(66,165,245,.2);
+  color:#42a5f5;animation:autoPulse 1s ease-in-out infinite
+}
+@keyframes autoPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(66,165,245,.15)}
+  50%{box-shadow:0 0 12px 2px rgba(66,165,245,.08)}
+}
+.ctrl *:disabled{
+  opacity:.35;pointer-events:none;filter:grayscale(.6)
+}
+#stxt{transition:color .3s}
+#stxt.err{color:#ef5350}
+#stxt.ok{color:#66bb6a}
+/* ---- Education ---- */
+.edu details{margin-top:4px}
+.edu summary{
+  cursor:pointer;font-weight:700;font-size:.85rem;
+  padding:8px 0;color:rgba(255,255,255,.35);
+  list-style:none;display:flex;align-items:center;gap:6px;
+  transition:color .2s
+}
+.edu summary:hover{color:rgba(255,255,255,.5)}
+.edu summary::-webkit-details-marker{display:none}
+.edu-box{
+  padding:14px 0 4px;font-size:.85rem;line-height:1.8;
+  color:rgba(255,255,255,.4)
+}
+.edu-box strong{color:#42a5f5}
+.edu-box code{
+  background:rgba(255,255,255,.05);padding:2px 8px;
+  border-radius:6px;font-family:inherit;color:rgba(255,255,255,.6)
+}
+.edu-box .eq{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0;justify-content:center}
+.edu-box .eq span{padding:3px 10px;border-radius:6px;background:rgba(66,165,245,.08);border:1px solid rgba(66,165,245,.12);color:#42a5f5;font-size:.8rem}
+.edu-box .eq .op{background:0 0;border:none;color:rgba(255,255,255,.2)}
+@media(max-width:480px){
+  .led{width:34px;height:34px}
+  .num-val{font-size:3.2rem}
+  .num-bin{font-size:1.3rem}
+  .card{padding:20px}
+}
+/* ---- Wire decorations ---- */
+.wire-row{
+  display:flex;justify-content:center;gap:5px;margin:0 0 4px
+}
+.wire-row span{
+  width:40px;height:4px;border-radius:2px;opacity:.6
+}
+.res-row span{
+  width:40px;height:8px;border-radius:3px;
+  background:linear-gradient(90deg,#1565c0 30%,#c62828 30% 35%,#212121 35% 40%,#1565c0 40% 70%,#c62828 70% 75%,#212121 75% 80%,#1565c0 80%);
+  opacity:.5
+}
+.hw-hint{
+  display:flex;justify-content:center;gap:24px;
+  margin-top:14px;padding-top:14px;
+  border-top:1px solid rgba(255,255,255,.06);font-size:.7rem;color:rgba(255,255,255,.3)
+}
+.res-row{
+  display:flex;justify-content:center;gap:5px;margin:0 0 8px
+}
+.res-row span{
+  width:40px;height:8px;border-radius:3px;
+  background:linear-gradient(90deg,#1565c0 30%,#c62828 30% 35%,#212121 35% 40%,#1565c0 40% 70%,#c62828 70% 75%,#212121 75% 80%,#1565c0 80%);
+  opacity:.5
+}
+.hw-hint{
+  display:flex;justify-content:center;gap:24px;
+  margin-top:14px;padding-top:14px;
+  border-top:1px solid #eee;font-size:.7rem;color:#aaa
+}
+.hw-part{display:inline-flex;align-items:center;gap:6px}
+.btn-vis{
+  display:inline-block;width:14px;height:10px;
+  background:linear-gradient(180deg,#555,#333);
+  border-radius:50%;border:2px solid #999;
+  box-shadow:0 1px 0 #999
+}
+.res-vis{
+  display:inline-block;width:18px;height:5px;
+  border-radius:2px;
+  background:linear-gradient(90deg,#1565c0 25%,#c62828 25% 30%,#212121 30% 35%,#1565c0 35% 65%,#c62828 65% 70%,#212121 70% 75%,#1565c0 75%);
+  opacity:.6
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="card header">
+  <h1><span>⚡</span> BitCounter <span class="pico-badge"><span class="badge-pad"></span></span></h1>
+  <div class="status">
+    <span class="dot off" id="dot"></span>
+    <span id="stxt">Conectando...</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="led-area">
+    <div class="res-row"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="wire-row" id="wr"></div>
+    <div class="led-row" id="lr"></div>
+    <div class="led-label" id="ll"></div>
+  </div>
+
+  <div class="num-wrap">
+    <div class="num-val" id="nv">0</div>
+    <div class="num-bin" id="nb">00000000</div>
+  </div>
+
+  <div class="powers" id="pr"></div>
+  <div class="sum-row" id="sr">Nenhum LED aceso</div>
+
+  <div class="ctrl">
+    <input type="number" id="inp" min="0" max="255" placeholder="0–255" value="">
+    <button class="btn-go" onclick="setNum()">Ir</button>
+    <button class="btn-sec" onclick="send('/inc')">+1</button>
+    <button class="btn-danger" onclick="send('/reset')">Resetar</button>
+  </div>
+  <div class="ctrl ctrl-row2">
+    <button class="btn-sec btn-adj" onclick="adj(-10)">−10</button>
+    <button class="btn-sec btn-adj" onclick="adj(-1)">−1</button>
+    <button class="btn-sec btn-adj" onclick="adj(1)">+1</button>
+    <button class="btn-sec btn-adj" onclick="adj(10)">+10</button>
+  </div>
+  <div class="ctrl">
+    <button class="btn-sec btn-auto" id="autoBtn" onclick="toggleAuto()">▶ Auto</button>
+  </div>
+  <div class="hw-hint">
+    <span class="hw-part"><span class="btn-vis"></span> Bt 16</span>
+    <span class="hw-part"><span class="btn-vis"></span> Bt 17</span>
+    <span class="hw-part"><span class="res-vis"></span> 330Ω</span>
+  </div>
+</div>
+
+<div class="card edu">
+  <details>
+    <summary>📖 Como funciona o sistema binário?</summary>
+    <div class="edu-box">
+      <p>O <strong>sistema binário</strong> (base 2) representa números usando apenas dois dígitos: <strong>0</strong> e <strong>1</strong> (bits).</p>
+      <br>
+      <p>Cada posição em um byte representa uma <strong>potência de 2</strong>.</p>
+      <br>
+      <div class="eq" id="powerTablePlaceholder"></div>
+      <br>
+      <p>Para converter binário → decimal, <strong>some as potências</strong> onde o bit for 1.</p>
+      <br>
+      <p><strong>Exemplo:</strong> <code>11010110</code></p>
+      <div class="eq">
+        <span>128</span><span class="op">+</span>
+        <span>64</span><span class="op">+</span>
+        <span style="opacity:.2">32</span><span class="op">+</span>
+        <span>16</span><span class="op">+</span>
+        <span style="opacity:.2">8</span><span class="op">+</span>
+        <span>4</span><span class="op">+</span>
+        <span>2</span><span class="op">+</span>
+        <span style="opacity:.2">1</span><span class="op">=</span>
+        <span style="background:rgba(66,165,245,.15)">214</span>
+      </div>
+      <p>Com 8 bits (1 byte) podemos representar números de <strong>0 a 255</strong>.</p>
+      <br>
+      <p>💡 <strong>Dica:</strong> Clique nos LEDs da interface para ligá-los/desligá-los individualmente. Os LEDs físicos no Pico acompanham!</p>
+    </div>
+  </details>
+</div>
+
+</div>
+
+<script>
+const S={counter:0,leds:[0,0,0,0,0,0,0,0],connected:false,error:""};
+const POWERS=[128,64,32,16,8,4,2,1];
+const LED_COLORS=['#fdd835','#1e88e5','#e53935','#43a047','#fdd835','#1e88e5','#e53935','#43a047'];
+const LED_NAMES=['Amarelo','Azul','Vermelho','Verde','Amarelo','Azul','Vermelho','Verde'];
+
+(function init(){
+  const lr=document.getElementById('lr');
+  const ll=document.getElementById('ll');
+  const pr=document.getElementById('pr');
+  const pt=document.getElementById('powerTablePlaceholder');
+  const SUP=['\u2070','\u00B9','\u00B2','\u00B3','\u2074','\u2075','\u2076','\u2077'];
+  const wr=document.getElementById('wr');
+  const WIRE_COLORS=['#fff','#e53935','#43a047','#fb8c00','#fdd835','#1e88e5','#e53935','#43a047'];
+  for(let i=7;i>=0;i--){
+    const d=document.createElement('div');d.className='led';d.dataset.i=i;
+    d.style.setProperty('--c',LED_COLORS[i]);
+    d.title=LED_NAMES[i]+' (2\u2070='+POWERS[7-i]+')';
+    d.addEventListener('click',()=>toggle(i));lr.appendChild(d);
+    const lb=document.createElement('span');lb.textContent='2'+SUP[i];ll.appendChild(lb);
+    const p=document.createElement('div');p.className='pow';p.dataset.i=i;
+    p.textContent=POWERS[7-i];pr.appendChild(p);
+    const ws=document.createElement('span');ws.style.background=WIRE_COLORS[i];wr.appendChild(ws);
+  }
+  pt.innerHTML=[
+    '<span>2\u2077</span><span class="op">=</span><span>128</span>',
+    '<span class="op">|</span>',
+    '<span>2\u2076</span><span class="op">=</span><span>64</span>',
+    '<span class="op">|</span>',
+    '<span>2\u2075</span><span class="op">=</span><span>32</span>',
+    '<span class="op">|</span>',
+    '<span>2\u2074</span><span class="op">=</span><span>16</span>',
+    '<span class="op">|</span>',
+    '<span>2\u00B3</span><span class="op">=</span><span>8</span>',
+    '<span class="op">|</span>',
+    '<span>2\u00B2</span><span class="op">=</span><span>4</span>',
+    '<span class="op">|</span>',
+    '<span>2\u00B9</span><span class="op">=</span><span>2</span>',
+    '<span class="op">|</span>',
+    '<span>2\u00B0</span><span class="op">=</span><span>1</span>'
+  ].join(' ');
+  document.getElementById('inp').addEventListener('keydown',e=>{if(e.key==='Enter')setNum()});
+})();
+
+function ui(){
+  document.querySelectorAll('.led').forEach(el=>{
+    el.className='led'+(S.leds[+el.dataset.i]?' on':' off');
+  });
+  document.getElementById('nv').textContent=S.counter;
+  document.getElementById('nb').textContent=S.counter.toString(2).padStart(8,'0');
+  const on=[];
+  document.querySelectorAll('.pow').forEach(el=>{
+    const i=+el.dataset.i;
+    const b=S.leds[i];
+    el.className='pow'+(b?' on':' off');
+    if(b)on.push(POWERS[7-i]);
+  });
+  const sr=document.getElementById('sr');
+  if(on.length){
+    const sum=on.reduce((a,b)=>a+b,0);
+    sr.innerHTML='<strong>'+on.join(' + ')+' = '+sum+'</strong>';
+  }else{
+    sr.innerHTML='Nenhum LED aceso';
+  }
+  const d=document.getElementById('dot');const t=document.getElementById('stxt');
+  if(S.connected){
+    d.className='dot on';t.textContent='Conectado';t.className='ok';
+  }else{
+    d.className='dot off';
+    t.textContent=S.error||'Pico nao encontrado';
+    t.className='err';
+  }
+  const en=S.connected;
+  document.querySelectorAll('.ctrl input,.ctrl button').forEach(el=>{el.disabled=!en});
+  document.querySelectorAll('.led').forEach(el=>{el.style.cursor=en?'pointer':'default'});
+}
+
+async function fetchState(){
+  try{
+    const r=await fetch('/state');const d=await r.json();Object.assign(S,d);ui();
+  }catch(e){}
+}
+
+async function send(p){
+  try{
+    const r=await fetch(p);
+    if(!r.ok&&r.status!==503)throw Error(r.status+'');
+    await fetchState();
+  }catch(e){}
+}
+
+function setNum(){
+  const v=parseInt(document.getElementById('inp').value);
+  if(!isNaN(v)&&v>=0&&v<=255)send('/set?value='+v);
+}
+
+function toggle(i){if(!S.connected)return;send('/toggle?led='+i)}
+
+function adj(d){
+  const v=Math.max(0,Math.min(255,S.counter+d));
+  send('/set?value='+v);
+}
+
+let autoInterval=null;
+function toggleAuto(){
+  const btn=document.getElementById('autoBtn');
+  if(autoInterval){
+    clearInterval(autoInterval);autoInterval=null;
+    btn.textContent='▶ Auto';btn.classList.remove('active');
+  }else{
+    autoInterval=setInterval(()=>send('/inc'),500);
+    btn.textContent='⏹ Parar';btn.classList.add('active');
+  }
+}
+
+setInterval(fetchState,60);
+fetchState();
+</script>
+</body>
+</html>
