@@ -21,8 +21,9 @@ O **BitCounter Pico** é um projeto educacional que ensina sistema binário na p
 | Resistor 330 Ω | 1/4 W | 8 |
 | Push button (tátil) | 6×6 mm | 2 |
 | Resistor 10 kΩ | pull-up externo (opcional — PULL_UP interno já usado) | 2 |
+| LCD 128×32 (ST7567A, I2C) | LCD_128X32_DOT (opcional) | 1 |
 | Protoboard | 400 ou 830 pontos | 1 |
-| Jumpers | Macho-macho e macho-fêmea | ~20 |
+| Jumpers | Macho-macho e macho-fêmea (10cm máx. para o LCD) | ~25 |
 
 ### Pinagem
 
@@ -37,9 +38,12 @@ GPIO 14 (Pin 19)  → LED 6
 GPIO 15 (Pin 20)  → LED 7  (MSB)
 GPIO 16 (Pin 21)  → Botão Count (pull-up, active low)
 GPIO 17 (Pin 22)  → Botão Reset (pull-up, active low)
+GPIO 20 (Pin 26)  → LCD SDA (I2C)
+GPIO 21 (Pin 27)  → LCD SCL (I2C)
 ```
 
 Cada LED deve ter o ânodo no GPIO, o cátodo no resistor de 330 Ω e o resistor no GND.
+O LCD requer alimentação **5V** (VBUS, pino 40) e cabos de no **máximo 10cm**.
 
 ---
 
@@ -61,7 +65,7 @@ Cada LED deve ter o ânodo no GPIO, o cátodo no resistor de 330 Ω e o resistor
 └──────────────────────┘                         │   └─────────────────────┘
 ```
 
-- **Pico (main.py)**: polling não-bloqueante dos botões com debounce de 50ms, comandos via serial, atualização dos LEDs.
+- **Pico (main.py)**: polling não-bloqueante dos botões com debounce de 50ms, comandos via serial, atualização dos LEDs e do LCD (ST7567A, I2C addr `0x3f`, SDA=GP20, SCL=GP21).
 - **PC (server.py)**: detecta o Pico automaticamente via `PING`/`PONG`, faz ponte entre serial e HTTP. Servidor local em `127.0.0.1:8000`.
 - **Browser (index.html)**: GUI com LEDs clicáveis, entrada de valor, auto-incremento, e painel educativo sobre binário.
 
@@ -77,7 +81,7 @@ Certifique-se de que o Pico está com o firmware **MicroPython** (não CircuitPy
 
 ```bash
 # Com o Pico conectado via USB
-mpremote cp main.py :
+mpremote cp main.py lcd128_32.py lcd128_32_fonts.py :
 mpremote reset
 ```
 
@@ -148,20 +152,24 @@ Comandos via `sys.stdin` com `select.poll(0)` (lê apenas quando há dado dispon
 
 ```
 bitcounter-pico/
-├── main.py           # Firmware do Pico (MicroPython)
+├── main.py               # Firmware do Pico (MicroPython)
+├── lcd128_32.py          # Driver LCD 128×32 ST7567A (opcional)
+├── lcd128_32_fonts.py    # Tabela de fontes 5×7 do LCD
 ├── host/
-│   ├── server.py     # Servidor HTTP/serial bridge (Python)
-│   └── index.html    # Interface web (HTML/CSS/JS)
+│   ├── server.py         # Servidor HTTP/serial bridge (Python)
+│   └── index.html        # Interface web (HTML/CSS/JS)
 ├── README.md
-└── AGENTS.md         # Notas para agentes de IA (opencode)
+└── AGENTS.md             # Notas para agentes de IA (opencode)
 ```
 
 ---
 
 ## Personalização
 
-- **Trocar pinos dos LEDs**: edite `LED_PINS` em `main.py` (linha 6).
-- **Velocidade de debounce**: altere `DEBOUNCE_MS` em `main.py` (linha 9).
+- **Trocar pinos dos LEDs**: edite `LED_PINS` em `main.py` (linha 14).
+- **Velocidade de debounce**: altere `DEBOUNCE_MS` em `main.py` (linha 17).
+- **Desabilitar LCD**: se não usar o display, o código detecta a ausência e funciona sem ele.
+- **Contraste do LCD**: ajuste o valor em `lcd128_32.py` (linha 40, comando `0x81` seguido do valor 0x00–0x3F).
 - **Porta do servidor HTTP**: defina a variável de ambiente `PORT` (ex.: `set PORT=3000` no Windows).
 - **Intervalo de polling da GUI**: altere o `setInterval(fetchState, 60)` em `index.html` (linha 439).
 
@@ -176,6 +184,7 @@ Projeto sem dependências de build, sem testes automatizados, sem linter. A úni
 - **Edge detection**: o `DebouncedButton` detecta borda de descida (`s != prev and s == 0`). Siga esse padrão ao adicionar botões.
 - **Contador**: usa `(counter + 1) % 256` (mod 256, não clamping). `send_state()` lê os pinos dos LEDs, não a variável `counter` — ambos são mantidos em sincronia.
 - **Serial quirk**: `SER.setDTR(False)` é chamado após abrir a porta serial para evitar reset automático em algumas placas RP2040.
+- **LCD**: alimentação em **5V** (VBUS, não 3.3V). Use cabos de **10cm no máximo**. Se o LCD não for conectado, o código funciona sem ele (tratamento de exceção).
 
 ---
 

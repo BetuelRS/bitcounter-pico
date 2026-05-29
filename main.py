@@ -3,6 +3,14 @@ import time
 import sys
 import select
 
+try:
+    from lcd128_32 import lcd128_32
+    import lcd128_32_fonts
+    lcd = lcd128_32(20, 21, 0, 0x3f)
+    lcd.Clear()
+except Exception:
+    lcd = None
+
 LED_PINS = [8, 9, 10, 11, 12, 13, 14, 15]
 BTN_COUNT_PIN = 16
 BTN_RESET_PIN = 17
@@ -41,7 +49,6 @@ breset = DebouncedButton(btn_reset)
 prev_count = 1
 prev_reset = 1
 
-
 def show_binary(value):
     for i in range(8):
         leds[i].value((value >> i) & 1)
@@ -50,6 +57,16 @@ def show_binary(value):
 def send_state():
     bits = "".join(str(leds[i].value()) for i in range(8))
     print(f"STATE:{counter}:{bits}")
+    if lcd:
+        lcd.Clear()
+        lcd.Cursor(0, 0)
+        lcd.Display(f"Ct:{counter:3d}")
+        lcd.Cursor(1, 0)
+        lcd.Display(f"Bi:{bits}")
+        lcd.Cursor(2, 0)
+        lcd.Display(f"Hx:{counter:02X}")
+        lcd.Cursor(3, 0)
+        lcd.Display(f"GP:{counter:3d}")
 
 
 def process_command(line):
