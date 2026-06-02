@@ -11,6 +11,27 @@ try:
 except Exception:
     lcd = None
 
+try:
+    from easter_game import play_game
+except ImportError:
+    play_game = None
+try:
+    from easter_pong import play_pong
+except ImportError:
+    play_pong = None
+try:
+    from easter_snake import play_snake
+except ImportError:
+    play_snake = None
+try:
+    from easter_loading import play_loading
+except ImportError:
+    play_loading = None
+try:
+    from easter_dice import play_dice
+except ImportError:
+    play_dice = None
+
 LED_PINS = [8, 9, 10, 11, 12, 13, 14, 15]
 BTN_COUNT_PIN = 16
 BTN_RESET_PIN = 17
@@ -21,6 +42,19 @@ btn_count = Pin(BTN_COUNT_PIN, Pin.IN, Pin.PULL_UP)
 btn_reset = Pin(BTN_RESET_PIN, Pin.IN, Pin.PULL_UP)
 
 counter = 0
+MODE_NORMAL = 0
+MODE_GAME = 1
+MODE_PONG = 2
+MODE_SNAKE = 3
+MODE_LOADING = 4
+MODE_DICE = 5
+mode = MODE_NORMAL
+cg_hold = 0
+pg_hold = 0
+sn_hold = 0
+ld_hold = 0
+dc_hold = 0
+HOLD_MS = 1500
 
 poll_obj = select.poll()
 poll_obj.register(sys.stdin, select.POLLIN)
@@ -102,23 +136,94 @@ def process_command(line):
         print("PONG")
 
 
+def _reset_after_egg():
+    global counter, mode, prev_count, prev_reset
+    counter = 0
+    show_binary(0)
+    send_state()
+    mode = MODE_NORMAL
+    prev_count = bcount.read()
+    prev_reset = breset.read()
+
+
 show_binary(counter)
 send_state()
 
 while True:
-    s = bcount.read()
-    if s != prev_count and s == 0:
+    sc = bcount.read()
+    if sc != prev_count and sc == 0:
         counter = (counter + 1) % 256
         show_binary(counter)
         send_state()
-    prev_count = s
+    prev_count = sc
 
-    s = breset.read()
-    if s != prev_reset and s == 0:
+    sr = breset.read()
+    if sr != prev_reset and sr == 0:
         counter = 0
         show_binary(counter)
         send_state()
-    prev_reset = s
+    prev_reset = sr
+
+    if mode == MODE_NORMAL:
+        if sc and not sr and counter == 13:
+            if cg_hold == 0:
+                cg_hold = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), cg_hold) >= HOLD_MS:
+                if play_game:
+                    mode = MODE_GAME
+                    play_game(lcd, leds, btn_count, btn_reset)
+                    _reset_after_egg()
+                cg_hold = 0
+        else:
+            cg_hold = 0
+
+        if sr and not sc and counter == 69:
+            if pg_hold == 0:
+                pg_hold = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), pg_hold) >= HOLD_MS:
+                if play_pong:
+                    mode = MODE_PONG
+                    play_pong(lcd, leds, btn_count, btn_reset)
+                    _reset_after_egg()
+                pg_hold = 0
+        else:
+            pg_hold = 0
+
+        if sr and not sc and counter == 99:
+            if ld_hold == 0:
+                ld_hold = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), ld_hold) >= HOLD_MS:
+                if play_loading:
+                    mode = MODE_LOADING
+                    play_loading(lcd, leds, btn_count, btn_reset)
+                    _reset_after_egg()
+                ld_hold = 0
+        else:
+            ld_hold = 0
+
+        if sc and sr and counter == 42:
+            if sn_hold == 0:
+                sn_hold = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), sn_hold) >= HOLD_MS:
+                if play_snake:
+                    mode = MODE_SNAKE
+                    play_snake(lcd, leds, btn_count, btn_reset)
+                    _reset_after_egg()
+                sn_hold = 0
+        else:
+            sn_hold = 0
+
+        if sc and sr and counter == 21:
+            if dc_hold == 0:
+                dc_hold = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), dc_hold) >= HOLD_MS:
+                if play_dice:
+                    mode = MODE_DICE
+                    play_dice(lcd, leds, btn_count, btn_reset)
+                    _reset_after_egg()
+                dc_hold = 0
+        else:
+            dc_hold = 0
 
     if poll_obj.poll(0):
         try:
